@@ -1,2 +1,4 @@
 node_modules/
-\n.env\npublic/app.js.map
+.env
+public/app.js.map
+jobs.json
