@@ -2,6 +2,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
+const cron = require('node-cron');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -65,9 +67,70 @@ class NodeFetchClient {
 // It's exported as default, but in CommonJS we need to access .default
 const AndroidSmsGatewayClient = require('android-sms-gateway').default;
 
+const JOBS_FILE = path.join(__dirname, 'jobs.json');
+
+// Initialize jobs file if it doesn't exist
+if (!fs.existsSync(JOBS_FILE)) {
+    fs.writeFileSync(JOBS_FILE, JSON.stringify([]));
+}
+
+function getJobs() {
+    try {
+        const data = fs.readFileSync(JOBS_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveJobs(jobs) {
+    fs.writeFileSync(JOBS_FILE, JSON.stringify(jobs, null, 2));
+}
+
+// Background task to process scheduled messages
+cron.schedule('* * * * *', async () => {
+    const jobs = getJobs();
+    const now = Date.now();
+    const pendingJobs = [];
+    const jobsToRun = [];
+
+    for (const job of jobs) {
+        if (job.scheduledTime <= now) {
+            jobsToRun.push(job);
+        } else {
+            pendingJobs.push(job);
+        }
+    }
+
+    if (jobsToRun.length > 0) {
+        saveJobs(pendingJobs); // Save remaining jobs immediately to avoid duplicates on crash
+
+        const login = process.env.GATEWAY_LOGIN;
+        const password = process.env.GATEWAY_PASSWORD;
+        const baseUrl = process.env.GATEWAY_URL || 'https://api.sms-gate.app/3rdparty/v1';
+
+        if (login && password) {
+            const httpClient = new NodeFetchClient();
+            const client = new AndroidSmsGatewayClient(login, password, httpClient, baseUrl);
+
+            for (const job of jobsToRun) {
+                try {
+                    await client.send(job.request);
+                    console.log(`[Cron] Sent scheduled message to ${job.request.phoneNumbers.length} recipients`);
+                } catch (err) {
+                    console.error('[Cron] Error sending scheduled SMS:', err);
+                    // In a more robust system, we might add this back to pendingJobs with a retry count
+                }
+            }
+        } else {
+            console.error('[Cron] Cannot send scheduled messages: Gateway credentials are not configured.');
+        }
+    }
+});
+
 app.post('/send-sms', async (req, res) => {
     try {
-        const { message, phoneNumbers } = req.body;
+        const { message, phoneNumbers, scheduledAt } = req.body;
 
         if (!message || !phoneNumbers || !Array.isArray(phoneNumbers) || phoneNumbers.length === 0) {
             return res.status(400).json({ error: 'Message and an array of phone numbers are required.' });
@@ -89,13 +152,37 @@ app.post('/send-sms', async (req, res) => {
             phoneNumbers: phoneNumbers,
         };
 
-        const state = await client.send(request);
+        let delay = 0;
+        if (scheduledAt) {
+            const scheduledTime = new Date(scheduledAt).getTime();
+            delay = scheduledTime - Date.now();
+        }
 
-        res.json({
-            success: true,
-            message: 'Message sent successfully to the gateway',
-            state: state
-        });
+        if (delay > 0) {
+            // To ensure the client wrapper doesn't fail immediately with bad credentials, check health first
+            await client.getHealth(); // This will throw 401 if unauthorized
+
+            const jobs = getJobs();
+            jobs.push({
+                scheduledTime: new Date(scheduledAt).getTime(),
+                request: request
+            });
+            saveJobs(jobs);
+
+            res.json({
+                success: true,
+                message: 'Message scheduled successfully',
+                scheduledFor: new Date(Date.now() + delay).toISOString()
+            });
+        } else {
+            const state = await client.send(request);
+
+            res.json({
+                success: true,
+                message: 'Message sent successfully to the gateway',
+                state: state
+            });
+        }
     } catch (error) {
         console.error('Error sending SMS:', error);
         res.status(500).json({

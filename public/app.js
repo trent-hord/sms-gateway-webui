@@ -3,6 +3,7 @@ document.getElementById('smsForm').addEventListener('submit', async function(e) 
 
     const phoneNumbersInput = document.getElementById('phoneNumbers').value;
     const message = document.getElementById('message').value;
+    const scheduledAtValue = document.getElementById('scheduledAt').value;
     const statusMessage = document.getElementById('statusMessage');
     const submitBtn = document.getElementById('submitBtn');
 
@@ -25,6 +26,11 @@ document.getElementById('smsForm').addEventListener('submit', async function(e) 
     submitBtn.disabled = true;
     submitBtn.innerText = 'Sending...';
 
+    let scheduledAt = null;
+    if (scheduledAtValue) {
+        scheduledAt = new Date(scheduledAtValue).toISOString();
+    }
+
     try {
         const response = await fetch('/send-sms', {
             method: 'POST',
@@ -33,7 +39,8 @@ document.getElementById('smsForm').addEventListener('submit', async function(e) 
             },
             body: JSON.stringify({
                 phoneNumbers: phoneNumbers,
-                message: message
+                message: message,
+                scheduledAt: scheduledAt
             })
         });
 
@@ -44,6 +51,7 @@ document.getElementById('smsForm').addEventListener('submit', async function(e) 
             // Clear the form
             document.getElementById('phoneNumbers').value = '';
             document.getElementById('message').value = '';
+            document.getElementById('scheduledAt').value = '';
         } else {
             showStatus(`Error: ${data.error} - ${data.details || ''}`, 'error');
         }
