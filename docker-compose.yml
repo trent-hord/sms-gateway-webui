@@ -1,0 +1,15 @@
+services:
+  web:
+    image: ghcr.io/trent-hord/sms-gateway-webui:latest
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - GATEWAY_LOGIN=your_gateway_login_here
+      - GATEWAY_PASSWORD=your_gateway_password_here
+      - GATEWAY_URL=https://api.sms-gate.app/3rdparty/v1
+      - JOBS_FILE=/app/data/jobs.json
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
