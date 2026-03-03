@@ -1,0 +1,7 @@
+node_modules/
+npm-debug.log
+.env
+jobs.json
+.git/
+.gitignore
+.dockerignore

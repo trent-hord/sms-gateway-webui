@@ -67,10 +67,15 @@ class NodeFetchClient {
 // It's exported as default, but in CommonJS we need to access .default
 const AndroidSmsGatewayClient = require('android-sms-gateway').default;
 
-const JOBS_FILE = path.join(__dirname, 'jobs.json');
+const JOBS_FILE = process.env.JOBS_FILE || path.join(__dirname, 'jobs.json');
 
 // Initialize jobs file if it doesn't exist
 if (!fs.existsSync(JOBS_FILE)) {
+    // Ensure parent directory exists
+    const dir = path.dirname(JOBS_FILE);
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
     fs.writeFileSync(JOBS_FILE, JSON.stringify([]));
 }
 
