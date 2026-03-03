@@ -87,6 +87,18 @@ function saveJobs(jobs) {
     fs.writeFileSync(JOBS_FILE, JSON.stringify(jobs, null, 2));
 }
 
+function calculateNextOccurrence(time, recurring) {
+    const date = new Date(time);
+    if (recurring === 'daily') {
+        date.setDate(date.getDate() + 1);
+    } else if (recurring === 'weekly') {
+        date.setDate(date.getDate() + 7);
+    } else if (recurring === 'monthly') {
+        date.setMonth(date.getMonth() + 1);
+    }
+    return date.getTime();
+}
+
 // Background task to process scheduled messages
 cron.schedule('* * * * *', async () => {
     const jobs = getJobs();
@@ -117,6 +129,18 @@ cron.schedule('* * * * *', async () => {
                 try {
                     await client.send(job.request);
                     console.log(`[Cron] Sent scheduled message to ${job.request.phoneNumbers.length} recipients`);
+
+                    if (job.recurring) {
+                        const nextTime = calculateNextOccurrence(job.scheduledTime, job.recurring);
+                        const allJobs = getJobs();
+                        allJobs.push({
+                            scheduledTime: nextTime,
+                            request: job.request,
+                            recurring: job.recurring
+                        });
+                        saveJobs(allJobs);
+                        console.log(`[Cron] Scheduled next occurrence for recurring message (recurring: ${job.recurring})`);
+                    }
                 } catch (err) {
                     console.error('[Cron] Error sending scheduled SMS:', err);
                     // In a more robust system, we might add this back to pendingJobs with a retry count
@@ -130,7 +154,7 @@ cron.schedule('* * * * *', async () => {
 
 app.post('/send-sms', async (req, res) => {
     try {
-        const { message, phoneNumbers, scheduledAt } = req.body;
+        const { message, phoneNumbers, scheduledAt, recurring } = req.body;
 
         if (!message || !phoneNumbers || !Array.isArray(phoneNumbers) || phoneNumbers.length === 0) {
             return res.status(400).json({ error: 'Message and an array of phone numbers are required.' });
@@ -165,7 +189,8 @@ app.post('/send-sms', async (req, res) => {
             const jobs = getJobs();
             jobs.push({
                 scheduledTime: new Date(scheduledAt).getTime(),
-                request: request
+                request: request,
+                recurring: recurring
             });
             saveJobs(jobs);
 
@@ -176,6 +201,18 @@ app.post('/send-sms', async (req, res) => {
             });
         } else {
             const state = await client.send(request);
+
+            if (recurring) {
+                const jobs = getJobs();
+                const nextTime = calculateNextOccurrence(Date.now(), recurring);
+                jobs.push({
+                    scheduledTime: nextTime,
+                    request: request,
+                    recurring: recurring
+                });
+                saveJobs(jobs);
+                console.log(`[Send-SMS] Message sent immediately and scheduled next occurrence for recurring message (recurring: ${recurring})`);
+            }
 
             res.json({
                 success: true,

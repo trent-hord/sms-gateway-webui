@@ -4,6 +4,7 @@ document.getElementById('smsForm').addEventListener('submit', async function(e) 
     const phoneNumbersInput = document.getElementById('phoneNumbers').value;
     const message = document.getElementById('message').value;
     const scheduledAtValue = document.getElementById('scheduledAt').value;
+    const recurringValue = document.getElementById('recurring').value;
     const statusMessage = document.getElementById('statusMessage');
     const submitBtn = document.getElementById('submitBtn');
 
@@ -31,6 +32,8 @@ document.getElementById('smsForm').addEventListener('submit', async function(e) 
         scheduledAt = new Date(scheduledAtValue).toISOString();
     }
 
+    let recurring = recurringValue !== 'none' ? recurringValue : null;
+
     try {
         const response = await fetch('/send-sms', {
             method: 'POST',
@@ -40,7 +43,8 @@ document.getElementById('smsForm').addEventListener('submit', async function(e) 
             body: JSON.stringify({
                 phoneNumbers: phoneNumbers,
                 message: message,
-                scheduledAt: scheduledAt
+                scheduledAt: scheduledAt,
+                recurring: recurring
             })
         });
 
@@ -52,6 +56,7 @@ document.getElementById('smsForm').addEventListener('submit', async function(e) 
             document.getElementById('phoneNumbers').value = '';
             document.getElementById('message').value = '';
             document.getElementById('scheduledAt').value = '';
+            document.getElementById('recurring').value = 'none';
         } else {
             showStatus(`Error: ${data.error} - ${data.details || ''}`, 'error');
         }

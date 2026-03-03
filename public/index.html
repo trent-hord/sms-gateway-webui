@@ -90,6 +90,16 @@
             <input type="datetime-local" id="scheduledAt" name="scheduledAt">
         </div>
 
+        <div class="form-group">
+            <label for="recurring">Recurring Schedule:</label>
+            <select id="recurring" name="recurring" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; box-sizing: border-box;">
+                <option value="none">None (One-time)</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+            </select>
+        </div>
+
         <button type="submit" id="submitBtn">Send Announcement</button>
     </form>
 
