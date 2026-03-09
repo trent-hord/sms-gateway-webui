@@ -82,7 +82,17 @@ if (!fs.existsSync(JOBS_FILE)) {
 function getJobs() {
     try {
         const data = fs.readFileSync(JOBS_FILE, 'utf8');
-        return JSON.parse(data);
+        let jobs = JSON.parse(data);
+        let updated = false;
+        jobs = jobs.map(j => {
+            if (!j.id) {
+                j.id = require('crypto').randomBytes(8).toString('hex');
+                updated = true;
+            }
+            return j;
+        });
+        if (updated) saveJobs(jobs);
+        return jobs;
     } catch (e) {
         return [];
     }
@@ -139,6 +149,7 @@ cron.schedule('* * * * *', async () => {
                         const nextTime = calculateNextOccurrence(job.scheduledTime, job.recurring);
                         const allJobs = getJobs();
                         allJobs.push({
+                            id: require('crypto').randomBytes(8).toString('hex'),
                             scheduledTime: nextTime,
                             request: job.request,
                             recurring: job.recurring
@@ -193,6 +204,7 @@ app.post('/send-sms', async (req, res) => {
 
             const jobs = getJobs();
             jobs.push({
+                id: require('crypto').randomBytes(8).toString('hex'),
                 scheduledTime: new Date(scheduledAt).getTime(),
                 request: request,
                 recurring: recurring
@@ -211,6 +223,7 @@ app.post('/send-sms', async (req, res) => {
                 const jobs = getJobs();
                 const nextTime = calculateNextOccurrence(Date.now(), recurring);
                 jobs.push({
+                    id: require('crypto').randomBytes(8).toString('hex'),
                     scheduledTime: nextTime,
                     request: request,
                     recurring: recurring
@@ -232,6 +245,39 @@ app.post('/send-sms', async (req, res) => {
             details: error.message
         });
     }
+});
+
+app.get('/jobs', (req, res) => {
+    res.json(getJobs());
+});
+
+app.delete('/jobs/:id', (req, res) => {
+    let jobs = getJobs();
+    const initialLength = jobs.length;
+    jobs = jobs.filter(j => j.id !== req.params.id);
+    if (jobs.length !== initialLength) {
+        saveJobs(jobs);
+        res.json({ success: true, message: 'Job deleted' });
+    } else {
+        res.status(404).json({ error: 'Job not found' });
+    }
+});
+
+app.put('/jobs/:id', (req, res) => {
+    const { message, phoneNumbers, scheduledAt, recurring } = req.body;
+    let jobs = getJobs();
+    const jobIndex = jobs.findIndex(j => j.id === req.params.id);
+    if (jobIndex === -1) {
+        return res.status(404).json({ error: 'Job not found' });
+    }
+    
+    if (message) jobs[jobIndex].request.message = message;
+    if (phoneNumbers) jobs[jobIndex].request.phoneNumbers = phoneNumbers;
+    if (scheduledAt) jobs[jobIndex].scheduledTime = new Date(scheduledAt).getTime();
+    if (recurring !== undefined) jobs[jobIndex].recurring = recurring === 'none' ? null : recurring;
+    
+    saveJobs(jobs);
+    res.json({ success: true, message: 'Job updated', job: jobs[jobIndex] });
 });
 
 app.listen(PORT, () => {
