@@ -105,9 +105,18 @@
         <div class="nav">
             <a href="/">New Message</a>
             <a href="/scheduled.html">Scheduled Messages</a>
+            <a href="/contacts.html">Contacts</a>
         </div>
         <h1>Send Group Announcement</h1>
         <form id="smsForm">
+            <div class="form-group" id="contactSelectorGroup" style="display: none;">
+                <label for="contactSelector">Insert Contact/Group:</label>
+                <div style="display: flex; gap: 10px;">
+                    <select id="contactSelector" style="flex: 1;"></select>
+                    <button type="button" id="btnAddContact" style="width: auto;">Add</button>
+                </div>
+            </div>
+
             <div class="form-group">
                 <label for="phoneNumbers">Phone Numbers (comma-separated or one per line):</label>
                 <textarea id="phoneNumbers" rows="4" placeholder="+1234567890, +0987654321..." required></textarea>
