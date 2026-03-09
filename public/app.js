@@ -1,4 +1,4 @@
-document.getElementById('smsForm').addEventListener('submit', async function(e) {
+document.getElementById('smsForm').addEventListener('submit', async function (e) {
     e.preventDefault();
 
     const phoneNumbersInput = document.getElementById('phoneNumbers').value;
@@ -74,3 +74,52 @@ function showStatus(message, type) {
     statusMessage.className = type;
     statusMessage.style.display = 'block';
 }
+
+let loadedContacts = [];
+
+async function initContacts() {
+    try {
+        const response = await fetch('/contacts');
+        if (response.ok) {
+            loadedContacts = await response.json();
+
+            if (loadedContacts.length > 0) {
+                document.getElementById('contactSelectorGroup').style.display = 'block';
+                const selector = document.getElementById('contactSelector');
+
+                loadedContacts.sort((a, b) => a.name.localeCompare(b.name));
+
+                loadedContacts.forEach(contact => {
+                    const opt = document.createElement('option');
+                    opt.value = contact.id;
+                    opt.textContent = `${contact.name} (${contact.type === 'group' ? 'Group' : 'Individual'}) - ${contact.phoneNumbers.length} numbers`;
+                    selector.appendChild(opt);
+                });
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load contacts', e);
+    }
+}
+
+document.getElementById('btnAddContact').addEventListener('click', () => {
+    const selector = document.getElementById('contactSelector');
+    const selectedId = selector.value;
+    if (!selectedId) return;
+
+    const contact = loadedContacts.find(c => c.id === selectedId);
+    if (contact) {
+        const phoneField = document.getElementById('phoneNumbers');
+        let currentNumbers = phoneField.value;
+        const newNumbers = contact.phoneNumbers.join(', ');
+
+        if (currentNumbers.trim().length > 0) {
+            phoneField.value = currentNumbers.trim() + ', ' + newNumbers;
+        } else {
+            phoneField.value = newNumbers;
+        }
+    }
+});
+
+// Initialize on page load
+initContacts();

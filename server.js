@@ -68,6 +68,7 @@ class NodeFetchClient {
 const AndroidSmsGatewayClient = require('android-sms-gateway').default;
 
 const JOBS_FILE = process.env.JOBS_FILE || path.join(__dirname, 'jobs.json');
+const CONTACTS_FILE = process.env.CONTACTS_FILE || path.join(__dirname, 'contacts.json');
 
 // Initialize jobs file if it doesn't exist
 if (!fs.existsSync(JOBS_FILE)) {
@@ -77,6 +78,16 @@ if (!fs.existsSync(JOBS_FILE)) {
         fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(JOBS_FILE, JSON.stringify([]));
+}
+
+// Initialize contacts file if it doesn't exist
+if (!fs.existsSync(CONTACTS_FILE)) {
+    // Ensure parent directory exists
+    const dir = path.dirname(CONTACTS_FILE);
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(CONTACTS_FILE, JSON.stringify([]));
 }
 
 function getJobs() {
@@ -100,6 +111,19 @@ function getJobs() {
 
 function saveJobs(jobs) {
     fs.writeFileSync(JOBS_FILE, JSON.stringify(jobs, null, 2));
+}
+
+function getContacts() {
+    try {
+        const data = fs.readFileSync(CONTACTS_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveContacts(contacts) {
+    fs.writeFileSync(CONTACTS_FILE, JSON.stringify(contacts, null, 2));
 }
 
 function calculateNextOccurrence(time, recurring) {
@@ -270,14 +294,68 @@ app.put('/jobs/:id', (req, res) => {
     if (jobIndex === -1) {
         return res.status(404).json({ error: 'Job not found' });
     }
-    
+
     if (message) jobs[jobIndex].request.message = message;
     if (phoneNumbers) jobs[jobIndex].request.phoneNumbers = phoneNumbers;
     if (scheduledAt) jobs[jobIndex].scheduledTime = new Date(scheduledAt).getTime();
     if (recurring !== undefined) jobs[jobIndex].recurring = recurring === 'none' ? null : recurring;
-    
+
     saveJobs(jobs);
     res.json({ success: true, message: 'Job updated', job: jobs[jobIndex] });
+});
+
+// Contacts CRUD
+app.get('/contacts', (req, res) => {
+    res.json(getContacts());
+});
+
+app.post('/contacts', (req, res) => {
+    const { name, phoneNumbers, type } = req.body;
+    if (!name || !phoneNumbers || !Array.isArray(phoneNumbers)) {
+        return res.status(400).json({ error: 'Name and a valid array of phoneNumbers are required.' });
+    }
+
+    const contacts = getContacts();
+    const newContact = {
+        id: require('crypto').randomBytes(8).toString('hex'),
+        name: name,
+        phoneNumbers: phoneNumbers,
+        type: type === 'group' ? 'group' : 'individual'
+    };
+
+    contacts.push(newContact);
+    saveContacts(contacts);
+    res.json({ success: true, message: 'Contact added successfully', contact: newContact });
+});
+
+app.put('/contacts/:id', (req, res) => {
+    const { name, phoneNumbers, type } = req.body;
+    let contacts = getContacts();
+    const contactIndex = contacts.findIndex(c => c.id === req.params.id);
+
+    if (contactIndex === -1) {
+        return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    if (name) contacts[contactIndex].name = name;
+    if (phoneNumbers && Array.isArray(phoneNumbers)) contacts[contactIndex].phoneNumbers = phoneNumbers;
+    if (type) contacts[contactIndex].type = type === 'group' ? 'group' : 'individual';
+
+    saveContacts(contacts);
+    res.json({ success: true, message: 'Contact updated successfully', contact: contacts[contactIndex] });
+});
+
+app.delete('/contacts/:id', (req, res) => {
+    let contacts = getContacts();
+    const initialLength = contacts.length;
+    contacts = contacts.filter(c => c.id !== req.params.id);
+
+    if (contacts.length !== initialLength) {
+        saveContacts(contacts);
+        res.json({ success: true, message: 'Contact deleted successfully' });
+    } else {
+        res.status(404).json({ error: 'Contact not found' });
+    }
 });
 
 app.listen(PORT, () => {

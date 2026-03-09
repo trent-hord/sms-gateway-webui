@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scheduled Messages - SMS Gateway Dashboard</title>
+    <title>Contacts - SMS Gateway Dashboard</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -22,7 +22,8 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
-        h1 {
+        h1,
+        h2 {
             text-align: center;
             color: #333;
         }
@@ -43,7 +44,8 @@
             text-decoration: underline;
         }
 
-        .job-card {
+        .contact-card,
+        .new-contact-form {
             border: 1px solid #ddd;
             border-radius: 8px;
             padding: 15px;
@@ -51,7 +53,12 @@
             background: #fafafa;
         }
 
-        .job-card h3 {
+        .new-contact-form {
+            background: #eef7ff;
+            border-color: #b8daff;
+        }
+
+        .contact-card h3 {
             margin-top: 0;
             color: #555;
             font-size: 16px;
@@ -70,7 +77,6 @@
 
         textarea,
         input[type="text"],
-        input[type="datetime-local"],
         select {
             width: 100%;
             padding: 8px;
@@ -93,6 +99,15 @@
             font-size: 14px;
             cursor: pointer;
             flex: 1;
+        }
+
+        .btn-add {
+            background-color: #007bff;
+            color: #fff;
+        }
+
+        .btn-add:hover {
+            background-color: #0056b3;
         }
 
         .btn-save {
@@ -138,6 +153,25 @@
             color: #777;
             font-size: 16px;
         }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .badge-group {
+            background-color: #e2e3e5;
+            color: #383d41;
+        }
+
+        .badge-individual {
+            background-color: #cce5ff;
+            color: #004085;
+        }
     </style>
 </head>
 
@@ -149,14 +183,38 @@
             <a href="/scheduled.html">Scheduled Messages</a>
             <a href="/contacts.html">Contacts</a>
         </div>
-        <h1>Scheduled & Recurring Messages</h1>
+        <h1>Manage Contacts & Groups</h1>
 
         <div id="statusMessage"></div>
-        <div id="loading">Loading jobs...</div>
-        <div id="jobsContainer"></div>
+
+        <div class="new-contact-form">
+            <h2>Add New Contact / Group</h2>
+            <div class="form-group">
+                <label>Name (e.g., "John Doe" or "Marketing Team"):</label>
+                <input type="text" id="newName" placeholder="Enter name...">
+            </div>
+            <div class="form-group">
+                <label>Type:</label>
+                <select id="newType">
+                    <option value="individual">Individual</option>
+                    <option value="group">Group</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Phone Numbers (comma or newline separated):</label>
+                <textarea id="newPhones" rows="3" placeholder="+1234567890, +0987654321..."></textarea>
+            </div>
+            <button class="btn-add" onclick="addContact()">Add Contact / Group</button>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
+
+        <h2>Saved Contacts & Groups</h2>
+        <div id="loading">Loading contacts...</div>
+        <div id="contactsContainer"></div>
     </div>
 
-    <script src="scheduled.js"></script>
+    <script src="contacts.js"></script>
 </body>
 
 </html>
