@@ -69,6 +69,7 @@ const AndroidSmsGatewayClient = require('android-sms-gateway').default;
 
 const JOBS_FILE = process.env.JOBS_FILE || path.join(__dirname, 'jobs.json');
 const CONTACTS_FILE = process.env.CONTACTS_FILE || path.join(__dirname, 'contacts.json');
+const HISTORY_FILE = process.env.HISTORY_FILE || path.join(__dirname, 'history.json');
 
 // Initialize jobs file if it doesn't exist
 if (!fs.existsSync(JOBS_FILE)) {
@@ -88,6 +89,16 @@ if (!fs.existsSync(CONTACTS_FILE)) {
         fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(CONTACTS_FILE, JSON.stringify([]));
+}
+
+// Initialize history file if it doesn't exist
+if (!fs.existsSync(HISTORY_FILE)) {
+    // Ensure parent directory exists
+    const dir = path.dirname(HISTORY_FILE);
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify([]));
 }
 
 function getJobs() {
@@ -124,6 +135,36 @@ function getContacts() {
 
 function saveContacts(contacts) {
     fs.writeFileSync(CONTACTS_FILE, JSON.stringify(contacts, null, 2));
+}
+
+function getHistory() {
+    try {
+        const data = fs.readFileSync(HISTORY_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveHistory(history) {
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
+}
+
+function addToHistory(request, status, details = null) {
+    const history = getHistory();
+    history.unshift({
+        id: require('crypto').randomBytes(8).toString('hex'),
+        timestamp: Date.now(),
+        message: request.message,
+        phoneNumbers: request.phoneNumbers,
+        status: status,
+        details: details
+    });
+    // Keep only last 100 entries
+    if (history.length > 100) {
+        history.length = 100;
+    }
+    saveHistory(history);
 }
 
 function calculateNextOccurrence(time, recurring) {
@@ -168,6 +209,7 @@ cron.schedule('* * * * *', async () => {
                 try {
                     await client.send(job.request);
                     console.log(`[Cron] Sent scheduled message to ${job.request.phoneNumbers.length} recipients`);
+                    addToHistory(job.request, 'sent', 'Scheduled message sent');
 
                     if (job.recurring) {
                         const nextTime = calculateNextOccurrence(job.scheduledTime, job.recurring);
@@ -183,6 +225,7 @@ cron.schedule('* * * * *', async () => {
                     }
                 } catch (err) {
                     console.error('[Cron] Error sending scheduled SMS:', err);
+                    addToHistory(job.request, 'failed', err.message);
                     // In a more robust system, we might add this back to pendingJobs with a retry count
                 }
             }
@@ -242,6 +285,7 @@ app.post('/send-sms', async (req, res) => {
             });
         } else {
             const state = await client.send(request);
+            addToHistory(request, 'sent', 'Message sent successfully');
 
             if (recurring) {
                 const jobs = getJobs();
@@ -264,10 +308,44 @@ app.post('/send-sms', async (req, res) => {
         }
     } catch (error) {
         console.error('Error sending SMS:', error);
+        
+        // Only add to history if it's not a scheduling request (delay <= 0)
+        // Or actually, maybe we should log failed attempts too? 
+        // But the request object might not be fully formed if it failed early.
+        // Let's at least log if it was an attempt to send now.
+        if (req.body && req.body.message && req.body.phoneNumbers) {
+            addToHistory({ 
+                message: req.body.message, 
+                phoneNumbers: req.body.phoneNumbers 
+            }, 'failed', error.message);
+        }
+
         res.status(500).json({
             error: 'Failed to send SMS via gateway',
             details: error.message
         });
+    }
+});
+
+// History endpoint
+app.get('/history', (req, res) => {
+    res.json(getHistory());
+});
+
+app.delete('/history', (req, res) => {
+    saveHistory([]);
+    res.json({ success: true, message: 'History cleared' });
+});
+
+app.delete('/history/:id', (req, res) => {
+    let history = getHistory();
+    const initialLength = history.length;
+    history = history.filter(item => item.id !== req.params.id);
+    if (history.length !== initialLength) {
+        saveHistory(history);
+        res.json({ success: true, message: 'History entry deleted' });
+    } else {
+        res.status(404).json({ error: 'History entry not found' });
     }
 });
 

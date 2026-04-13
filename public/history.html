@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMS History - SMS Gateway Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        .nav {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .nav a {
+            text-decoration: none;
+            color: #007bff;
+            font-weight: bold;
+            margin: 0 10px;
+        }
+
+        .nav a:hover {
+            text-decoration: underline;
+        }
+
+        .history-list {
+            margin-top: 20px;
+        }
+
+        .history-item {
+            border-bottom: 1px solid #eee;
+            padding: 15px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .timestamp {
+            font-weight: bold;
+        }
+
+        .status {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .status-sent {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-failed {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .message-content {
+            font-size: 1.1em;
+            color: #333;
+            white-space: pre-wrap;
+            margin: 5px 0;
+        }
+
+        .recipients {
+            font-size: 0.85em;
+            color: #555;
+        }
+
+        .details {
+            font-size: 0.8em;
+            color: #888;
+            font-style: italic;
+        }
+
+        .actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 5px;
+        }
+
+        .btn-delete {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+
+        .btn-delete:hover {
+            background-color: #c82333;
+        }
+
+        .btn-clear {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        .btn-clear:hover {
+            background-color: #5a6268;
+        }
+
+        #emptyState {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+            font-style: italic;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="nav">
+            <a href="/">New Message</a>
+            <a href="/scheduled.html">Scheduled Messages</a>
+            <a href="/contacts.html">Contacts</a>
+            <a href="/history.html">History</a>
+        </div>
+        <h1>SMS History</h1>
+        
+        <button id="btnClearHistory" class="btn-clear" style="display: none;">Clear All History</button>
+        
+        <div id="historyList" class="history-list">
+            <div id="loading" style="text-align: center; padding: 20px;">Loading history...</div>
+        </div>
+
+        <div id="emptyState" style="display: none;">
+            No message history found. Sent messages will appear here.
+        </div>
+    </div>
+
+    <script src="history.js"></script>
+</body>
+
+</html>
