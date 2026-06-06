@@ -179,6 +179,34 @@ function calculateNextOccurrence(time, recurring) {
     return date.getTime();
 }
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function sendSmsWithRecipientDelay(client, request) {
+    const shouldDelayBetweenRecipients = request.phoneNumbers.length > 2;
+    const states = [];
+
+    for (let i = 0; i < request.phoneNumbers.length; i++) {
+        const phoneNumber = request.phoneNumbers[i];
+        const state = await client.send({
+            message: request.message,
+            phoneNumbers: [phoneNumber],
+        });
+
+        states.push({
+            phoneNumber,
+            state,
+        });
+
+        if (shouldDelayBetweenRecipients && i < request.phoneNumbers.length - 1) {
+            await sleep(2000);
+        }
+    }
+
+    return states;
+}
+
 // Background task to process scheduled messages
 cron.schedule('* * * * *', async () => {
     const jobs = getJobs();
@@ -207,7 +235,7 @@ cron.schedule('* * * * *', async () => {
 
             for (const job of jobsToRun) {
                 try {
-                    await client.send(job.request);
+                    await sendSmsWithRecipientDelay(client, job.request);
                     console.log(`[Cron] Sent scheduled message to ${job.request.phoneNumbers.length} recipients`);
                     addToHistory(job.request, 'sent', 'Scheduled message sent');
 
@@ -284,7 +312,7 @@ app.post('/send-sms', async (req, res) => {
                 scheduledFor: new Date(Date.now() + delay).toISOString()
             });
         } else {
-            const state = await client.send(request);
+            const state = await sendSmsWithRecipientDelay(client, request);
             addToHistory(request, 'sent', 'Message sent successfully');
 
             if (recurring) {
