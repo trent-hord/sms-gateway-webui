@@ -1,0 +1,42 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "main", "master", "dev" ]
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Docker CLI
+        run: |
+          curl -fsSL https://get.docker.com | sh
+
+      - name: Checkout repository
+        run: |
+          REGISTRY=$(echo "${{ github.server_url }}" | sed 's|https://||')
+          git clone https://oauth2:${{ secrets.ACTIONS_TOKEN }}@${REGISTRY}/${{ github.repository }} .
+          git checkout ${{ github.sha }}
+
+      - name: Log in to the Container registry
+        run: |
+          REGISTRY=$(echo "${{ github.server_url }}" | sed 's|https://||')
+          echo "${{ secrets.ACTIONS_TOKEN }}" | docker login ${REGISTRY} -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push Docker image
+        run: |
+          REGISTRY=$(echo "${{ github.server_url }}" | sed 's|https://||')
+          IMAGE=${REGISTRY}/${{ github.repository }}
+          SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          docker build -t ${IMAGE}:latest -t ${IMAGE}:sha-${SHA} -t ${IMAGE}:v1.0.${{ github.run_number }} .
+          docker push ${IMAGE}:latest
+          docker push ${IMAGE}:sha-${SHA}
+          docker push ${IMAGE}:v1.0.${{ github.run_number }}
