@@ -1,6 +1,6 @@
 # SMS Gateway Web UI
 
-A Node.js and Express web application built to send SMS announcements via the capcom6 `android-sms-gateway` SDK.
+A Node.js and Express web application built to send SMS announcements via an Android SMS Gateway third-party API.
 
 ## Features
 

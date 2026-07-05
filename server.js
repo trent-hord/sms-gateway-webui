@@ -12,8 +12,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Implement a simple wrapper around node-fetch to match the HttpClient interface
-// expected by android-sms-gateway
 const fetch = require('node-fetch');
 
 class NodeFetchClient {
@@ -63,15 +61,30 @@ class NodeFetchClient {
     }
 }
 
-// Import Client from the android-sms-gateway package
-// It's exported as default, but in CommonJS we need to access .default
-const AndroidSmsGatewayClient = require('android-sms-gateway').default;
-
 const DEFAULT_GATEWAY_URL = 'https://api.sms-gate.app/3rdparty/v1';
 const JOBS_FILE = process.env.JOBS_FILE || path.join(__dirname, 'jobs.json');
 const CONTACTS_FILE = process.env.CONTACTS_FILE || path.join(__dirname, 'contacts.json');
 const HISTORY_FILE = process.env.HISTORY_FILE || path.join(__dirname, 'history.json');
 const SETTINGS_FILE = process.env.SETTINGS_FILE || path.join(__dirname, 'settings.json');
+
+class SmsGatewayClient {
+    constructor(login, password, httpClient, baseUrl) {
+        this.baseUrl = normalizeGatewayUrl(baseUrl);
+        this.httpClient = httpClient;
+        this.defaultHeaders = {
+            'User-Agent': 'sms-gateway-webui/1.0',
+            Authorization: `Basic ${Buffer.from(`${login}:${password}`).toString('base64')}`
+        };
+    }
+
+    send(request) {
+        return this.httpClient.post(`${this.baseUrl}/messages`, request, this.defaultHeaders);
+    }
+
+    getHealth() {
+        return this.httpClient.get(`${this.baseUrl}/health`, this.defaultHeaders);
+    }
+}
 
 function ensureJsonFile(filePath, defaultValue) {
     if (fs.existsSync(filePath)) {
@@ -278,7 +291,7 @@ cron.schedule('* * * * *', async () => {
 
         if (login && password) {
             const httpClient = new NodeFetchClient();
-            const client = new AndroidSmsGatewayClient(login, password, httpClient, baseUrl);
+            const client = new SmsGatewayClient(login, password, httpClient, baseUrl);
 
             for (const job of jobsToRun) {
                 try {
@@ -327,7 +340,7 @@ app.post('/send-sms', async (req, res) => {
         }
 
         const httpClient = new NodeFetchClient();
-        const client = new AndroidSmsGatewayClient(login, password, httpClient, baseUrl);
+        const client = new SmsGatewayClient(login, password, httpClient, baseUrl);
 
         const request = {
             message: message,
