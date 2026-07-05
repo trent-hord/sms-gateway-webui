@@ -9,6 +9,7 @@ services:
       - GATEWAY_PASSWORD=your_gateway_password_here
       - GATEWAY_URL=https://api.sms-gate.app/3rdparty/v1
       - JOBS_FILE=/app/data/jobs.json
+      - SETTINGS_FILE=/app/data/settings.json
     volumes:
       - ./data:/app/data
     restart: unless-stopped

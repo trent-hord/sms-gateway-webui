@@ -24,6 +24,7 @@ PORT=3000
 GATEWAY_LOGIN=your_gateway_login_here
 GATEWAY_PASSWORD=your_gateway_password_here
 GATEWAY_URL=https://api.sms-gate.app/3rdparty/v1
+SETTINGS_FILE=./settings.json
 ```
 
 ### Environment Variables
@@ -31,9 +32,10 @@ GATEWAY_URL=https://api.sms-gate.app/3rdparty/v1
 - `PORT`: The port on which the web server runs (default: `3000`).
 - `GATEWAY_LOGIN`: Your android-sms-gateway login.
 - `GATEWAY_PASSWORD`: Your android-sms-gateway password.
-- `GATEWAY_URL`: The API URL for the gateway (default: `https://api.sms-gate.app/3rdparty/v1`).
+- `GATEWAY_URL`: The default API URL for the gateway (default: `https://api.sms-gate.app/3rdparty/v1`). This can be changed from the Settings page after startup.
 - `JOBS_FILE` (Optional): Path to the jobs storage file.
 - `CONTACTS_FILE` (Optional): Path to the contacts storage file.
+- `SETTINGS_FILE` (Optional): Path to the settings storage file.
 
 ## Running the Application
 
@@ -73,3 +75,4 @@ The frontend consists of vanilla HTML, CSS, and JavaScript served statically fro
 - **New Message (`/`)**: Form to create and send/schedule a new SMS.
 - **Scheduled Messages (`/scheduled.html`)**: View, edit, or delete scheduled and recurring messages.
 - **Contacts (`/contacts.html`)**: Add and manage your saved contacts and groups.
+- **Settings (`/settings.html`)**: Configure the gateway API URL used for sending messages.

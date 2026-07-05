@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMS Gateway Dashboard</title>
+    <title>Settings - SMS Gateway Dashboard</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -14,7 +14,7 @@
         }
 
         .container {
-            max-width: 600px;
+            max-width: 800px;
             margin: 0 auto;
             background: #fff;
             padding: 20px;
@@ -22,7 +22,8 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
-        h1 {
+        h1,
+        h2 {
             text-align: center;
             color: #333;
         }
@@ -43,6 +44,13 @@
             text-decoration: underline;
         }
 
+        .settings-panel {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            background: #fafafa;
+        }
+
         .form-group {
             margin-bottom: 15px;
         }
@@ -51,16 +59,23 @@
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
+            font-size: 14px;
         }
 
-        textarea,
-        input[type="text"] {
+        input[type="url"] {
             width: 100%;
             padding: 10px;
             border: 1px solid #ccc;
             border-radius: 4px;
             font-size: 16px;
             box-sizing: border-box;
+        }
+
+        .meta {
+            color: #666;
+            font-size: 13px;
+            margin-top: 6px;
+            word-break: break-word;
         }
 
         button {
@@ -78,11 +93,17 @@
             background-color: #218838;
         }
 
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
         #statusMessage {
             margin-top: 15px;
             padding: 10px;
             border-radius: 4px;
             display: none;
+            text-align: center;
         }
 
         .success {
@@ -100,7 +121,6 @@
 </head>
 
 <body>
-
     <div class="container">
         <div class="nav">
             <a href="/">New Message</a>
@@ -109,49 +129,26 @@
             <a href="/history.html">History</a>
             <a href="/settings.html">Settings</a>
         </div>
-        <h1>Send Group Announcement</h1>
-        <form id="smsForm">
-            <div class="form-group" id="contactSelectorGroup" style="display: none;">
-                <label for="contactSelector">Insert Contact/Group:</label>
-                <div style="display: flex; gap: 10px;">
-                    <select id="contactSelector" style="flex: 1;"></select>
-                    <button type="button" id="btnAddContact" style="width: auto;">Add</button>
+
+        <h1>Settings</h1>
+
+        <div class="settings-panel">
+            <h2>Gateway</h2>
+            <form id="settingsForm">
+                <div class="form-group">
+                    <label for="gatewayUrl">Gateway API URL</label>
+                    <input type="url" id="gatewayUrl" placeholder="https://sms.hostedserver.cloud/3rdparty/v1" required>
+                    <div id="gatewaySource" class="meta"></div>
                 </div>
-            </div>
 
-            <div class="form-group">
-                <label for="phoneNumbers">Phone Numbers (comma-separated or one per line):</label>
-                <textarea id="phoneNumbers" rows="4" placeholder="+1234567890, +0987654321..." required></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="message">Message:</label>
-                <textarea id="message" rows="5" placeholder="Type your announcement here..." required></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="scheduledAt">Schedule for later (optional):</label>
-                <input type="datetime-local" id="scheduledAt" name="scheduledAt">
-            </div>
-
-            <div class="form-group">
-                <label for="recurring">Recurring Schedule:</label>
-                <select id="recurring" name="recurring"
-                    style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; box-sizing: border-box;">
-                    <option value="none">None (One-time)</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                </select>
-            </div>
-
-            <button type="submit" id="submitBtn">Send Announcement</button>
-        </form>
+                <button type="submit" id="saveBtn">Save Settings</button>
+            </form>
+        </div>
 
         <div id="statusMessage"></div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="settings.js"></script>
 </body>
 
 </html>

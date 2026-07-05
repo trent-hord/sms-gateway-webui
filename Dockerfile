@@ -12,6 +12,7 @@ COPY . .
 # Set environment variables
 ENV PORT=3000
 ENV JOBS_FILE=/app/data/jobs.json
+ENV SETTINGS_FILE=/app/data/settings.json
 
 # Expose port
 EXPOSE 3000

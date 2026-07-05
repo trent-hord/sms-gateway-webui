@@ -2,3 +2,5 @@ node_modules/
 .env
 public/app.js.map
 jobs.json
+history.json
+settings.json

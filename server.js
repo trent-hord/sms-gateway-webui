@@ -67,38 +67,85 @@ class NodeFetchClient {
 // It's exported as default, but in CommonJS we need to access .default
 const AndroidSmsGatewayClient = require('android-sms-gateway').default;
 
+const DEFAULT_GATEWAY_URL = 'https://api.sms-gate.app/3rdparty/v1';
 const JOBS_FILE = process.env.JOBS_FILE || path.join(__dirname, 'jobs.json');
 const CONTACTS_FILE = process.env.CONTACTS_FILE || path.join(__dirname, 'contacts.json');
 const HISTORY_FILE = process.env.HISTORY_FILE || path.join(__dirname, 'history.json');
+const SETTINGS_FILE = process.env.SETTINGS_FILE || path.join(__dirname, 'settings.json');
 
-// Initialize jobs file if it doesn't exist
-if (!fs.existsSync(JOBS_FILE)) {
-    // Ensure parent directory exists
-    const dir = path.dirname(JOBS_FILE);
+function ensureJsonFile(filePath, defaultValue) {
+    if (fs.existsSync(filePath)) {
+        return;
+    }
+
+    const dir = path.dirname(filePath);
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(JOBS_FILE, JSON.stringify([]));
+
+    fs.writeFileSync(filePath, JSON.stringify(defaultValue, null, 2));
 }
 
-// Initialize contacts file if it doesn't exist
-if (!fs.existsSync(CONTACTS_FILE)) {
-    // Ensure parent directory exists
-    const dir = path.dirname(CONTACTS_FILE);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(CONTACTS_FILE, JSON.stringify([]));
+ensureJsonFile(JOBS_FILE, []);
+ensureJsonFile(CONTACTS_FILE, []);
+ensureJsonFile(HISTORY_FILE, []);
+ensureJsonFile(SETTINGS_FILE, {});
+
+function normalizeGatewayUrl(gatewayUrl) {
+    return gatewayUrl.trim().replace(/\/+$/, '');
 }
 
-// Initialize history file if it doesn't exist
-if (!fs.existsSync(HISTORY_FILE)) {
-    // Ensure parent directory exists
-    const dir = path.dirname(HISTORY_FILE);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+function validateGatewayUrl(gatewayUrl) {
+    if (!gatewayUrl || typeof gatewayUrl !== 'string') {
+        return 'Gateway URL is required.';
     }
-    fs.writeFileSync(HISTORY_FILE, JSON.stringify([]));
+
+    let parsed;
+    try {
+        parsed = new URL(gatewayUrl);
+    } catch (e) {
+        return 'Gateway URL must be a valid URL.';
+    }
+
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return 'Gateway URL must start with http:// or https://.';
+    }
+
+    return null;
+}
+
+function getEnvGatewayUrl() {
+    return normalizeGatewayUrl(process.env.GATEWAY_URL || DEFAULT_GATEWAY_URL);
+}
+
+function getSettings() {
+    let savedSettings = {};
+    try {
+        const data = fs.readFileSync(SETTINGS_FILE, 'utf8');
+        savedSettings = JSON.parse(data);
+    } catch (e) {
+        savedSettings = {};
+    }
+
+    const savedGatewayUrl = typeof savedSettings.gatewayUrl === 'string'
+        ? normalizeGatewayUrl(savedSettings.gatewayUrl)
+        : '';
+    const gatewayUrl = savedGatewayUrl || getEnvGatewayUrl();
+
+    return {
+        gatewayUrl,
+        savedGatewayUrl,
+        source: savedGatewayUrl ? 'saved' : (process.env.GATEWAY_URL ? 'env' : 'default'),
+        defaultGatewayUrl: DEFAULT_GATEWAY_URL
+    };
+}
+
+function saveSettings(settings) {
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+}
+
+function getGatewayUrl() {
+    return getSettings().gatewayUrl;
 }
 
 function getJobs() {
@@ -227,7 +274,7 @@ cron.schedule('* * * * *', async () => {
 
         const login = process.env.GATEWAY_LOGIN;
         const password = process.env.GATEWAY_PASSWORD;
-        const baseUrl = process.env.GATEWAY_URL || 'https://api.sms-gate.app/3rdparty/v1';
+        const baseUrl = getGatewayUrl();
 
         if (login && password) {
             const httpClient = new NodeFetchClient();
@@ -273,7 +320,7 @@ app.post('/send-sms', async (req, res) => {
 
         const login = process.env.GATEWAY_LOGIN;
         const password = process.env.GATEWAY_PASSWORD;
-        const baseUrl = process.env.GATEWAY_URL || 'https://api.sms-gate.app/3rdparty/v1'; // Default Cloud URL
+        const baseUrl = getGatewayUrl();
 
         if (!login || !password) {
             return res.status(500).json({ error: 'Gateway credentials are not configured.' });
@@ -353,6 +400,29 @@ app.post('/send-sms', async (req, res) => {
             details: error.message
         });
     }
+});
+
+app.get('/settings', (req, res) => {
+    res.json(getSettings());
+});
+
+app.put('/settings', (req, res) => {
+    const gatewayUrl = typeof req.body.gatewayUrl === 'string'
+        ? normalizeGatewayUrl(req.body.gatewayUrl)
+        : '';
+    const validationError = validateGatewayUrl(gatewayUrl);
+
+    if (validationError) {
+        return res.status(400).json({ error: validationError });
+    }
+
+    saveSettings({ gatewayUrl });
+
+    res.json({
+        success: true,
+        message: 'Settings saved successfully',
+        settings: getSettings()
+    });
 });
 
 // History endpoint
