@@ -66,6 +66,7 @@ const JOBS_FILE = process.env.JOBS_FILE || path.join(__dirname, 'jobs.json');
 const CONTACTS_FILE = process.env.CONTACTS_FILE || path.join(__dirname, 'contacts.json');
 const HISTORY_FILE = process.env.HISTORY_FILE || path.join(__dirname, 'history.json');
 const SETTINGS_FILE = process.env.SETTINGS_FILE || path.join(__dirname, 'settings.json');
+const WEBHOOK_HISTORY_FILE = process.env.WEBHOOK_HISTORY_FILE || path.join(__dirname, 'webhook-history.json');
 
 class SmsGatewayClient {
     constructor(login, password, httpClient, baseUrl) {
@@ -115,6 +116,7 @@ ensureJsonFile(JOBS_FILE, []);
 ensureJsonFile(CONTACTS_FILE, []);
 ensureJsonFile(HISTORY_FILE, []);
 ensureJsonFile(SETTINGS_FILE, {});
+ensureJsonFile(WEBHOOK_HISTORY_FILE, []);
 
 function normalizeGatewayUrl(gatewayUrl) {
     return gatewayUrl.trim().replace(/\/+$/, '');
@@ -237,6 +239,36 @@ function addToHistory(request, status, details = null) {
         history.length = 100;
     }
     saveHistory(history);
+}
+
+function getWebhookHistory() {
+    try {
+        const data = fs.readFileSync(WEBHOOK_HISTORY_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveWebhookHistory(history) {
+    fs.writeFileSync(WEBHOOK_HISTORY_FILE, JSON.stringify(history, null, 2));
+}
+
+function addWebhookToHistory(event, source, payload, response = null) {
+    const history = getWebhookHistory();
+    history.unshift({
+        id: require('crypto').randomBytes(8).toString('hex'),
+        timestamp: Date.now(),
+        event: event,
+        source: source,
+        payload: payload,
+        response: response
+    });
+    // Keep only last 100 entries
+    if (history.length > 100) {
+        history.length = 100;
+    }
+    saveWebhookHistory(history);
 }
 
 function calculateNextOccurrence(time, recurring) {
@@ -766,6 +798,14 @@ app.post('/webhooks/:id/test', async (req, res) => {
                 timeout: 10000
             });
         } catch (fetchError) {
+            const testResponse = {
+                success: false,
+                status: 0,
+                statusText: 'Request Failed',
+                responseBody: fetchError.message
+            };
+            addWebhookToHistory(webhook.event, `Test Run (${webhook.url})`, mockPayload, testResponse);
+
             return res.json({
                 success: false,
                 status: 0,
@@ -780,6 +820,14 @@ app.post('/webhooks/:id/test', async (req, res) => {
             ? responseText.substring(0, 2000) + '... (truncated)' 
             : responseText;
 
+        const testResponse = {
+            success: response.ok,
+            status: response.status,
+            statusText: response.statusText,
+            responseBody: truncatedResponse
+        };
+        addWebhookToHistory(webhook.event, `Test Run (${webhook.url})`, mockPayload, testResponse);
+
         res.json({
             success: response.ok,
             status: response.status,
@@ -791,6 +839,38 @@ app.post('/webhooks/:id/test', async (req, res) => {
         console.error('Error testing webhook:', error);
         res.status(500).json({ error: 'Failed to test webhook', details: error.message });
     }
+});
+
+// Incoming generic webhook receiver to log events
+app.post('/api/webhooks/incoming', (req, res) => {
+    try {
+        const payload = req.body;
+        const eventType = payload.event || 'unknown';
+        
+        // Log incoming event
+        addWebhookToHistory(eventType, 'Incoming Event', payload, {
+            success: true,
+            status: 200,
+            statusText: 'OK',
+            responseBody: 'Event received and logged by SMS Gateway WebUI'
+        });
+
+        res.json({ success: true, message: 'Webhook event received and logged' });
+    } catch (error) {
+        console.error('Error logging incoming webhook:', error);
+        res.status(500).json({ error: 'Failed to process incoming webhook event' });
+    }
+});
+
+// Get webhook history log
+app.get('/api/webhooks/history', (req, res) => {
+    res.json(getWebhookHistory());
+});
+
+// Clear webhook history log
+app.delete('/api/webhooks/history', (req, res) => {
+    saveWebhookHistory([]);
+    res.json({ success: true, message: 'Webhook history cleared' });
 });
 
 app.listen(PORT, () => {

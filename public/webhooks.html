@@ -350,6 +350,65 @@
             border: 1px solid #fca5a5;
         }
 
+        /* History Item Styles */
+        .history-card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 16px;
+            box-shadow: var(--shadow-sm);
+            transition: box-shadow 0.2s;
+        }
+        .history-card:hover {
+            box-shadow: var(--shadow-md);
+        }
+        .history-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .history-timestamp {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .badge-source-test {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .badge-source-incoming {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        .history-payload-toggle {
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--primary);
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 10px;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+        .history-payload-toggle:hover {
+            text-decoration: underline;
+        }
+        .history-details-block {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--border-color);
+        }
+        .history-details-block.open {
+            display: block;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-5px); }
             to { opacity: 1; transform: translateY(0); }
@@ -421,6 +480,28 @@
             <h2>Registered Webhooks</h2>
             <div id="loading">Loading registered webhooks...</div>
             <div id="webhooksContainer" class="webhooks-grid"></div>
+        </div>
+
+        <!-- Webhook Event Log panel -->
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 40px 0 30px 0;">
+
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2 style="margin: 0; border-bottom: none; padding-bottom: 0;">Webhook Event Log</h2>
+                <button class="btn btn-secondary" id="btnClearWebhookHistory" onclick="clearWebhookHistory()" style="padding: 6px 12px; font-size: 13px; width: auto;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    Clear Log
+                </button>
+            </div>
+
+            <div style="background-color: #f8fafc; border-left: 4px solid var(--primary); padding: 12px 16px; margin-bottom: 20px; border-radius: 0 var(--radius-md) var(--radius-md) 0; font-size: 13px; text-align: left;">
+                <strong style="color: var(--primary);">Webhook Relay Config:</strong> Point your Android SMS Gateway's webhook URL to 
+                <code id="relayUrlCode" style="background: #e2e8f0; padding: 2px 5px; border-radius: 3px; font-family: monospace; font-weight: bold;">http://&lt;server-ip&gt;:3000/api/webhooks/incoming</code> 
+                to log real-time messages received on your device!
+            </div>
+
+            <div id="historyLoading" style="text-align: center; padding: 20px; color: var(--text-muted); font-weight: 500;">Loading event log...</div>
+            <div id="webhookHistoryContainer" class="webhooks-grid"></div>
         </div>
     </div>
 

@@ -1,4 +1,11 @@
-document.addEventListener('DOMContentLoaded', loadWebhooks);
+document.addEventListener('DOMContentLoaded', () => {
+    loadWebhooks();
+    loadWebhookHistory();
+    const relayUrlCode = document.getElementById('relayUrlCode');
+    if (relayUrlCode) {
+        relayUrlCode.innerText = window.location.origin + '/api/webhooks/incoming';
+    }
+});
 
 function showStatus(message, type) {
     const statusMessage = document.getElementById('statusMessage');
@@ -286,6 +293,8 @@ async function testWebhook(id) {
 
         const data = await res.json();
         
+        loadWebhookHistory();
+        
         const resultsContainer = document.getElementById(`test-results-${id}`);
         resultsContainer.style.display = 'block';
 
@@ -323,5 +332,123 @@ function closeTestResults(id) {
     const resultsContainer = document.getElementById(`test-results-${id}`);
     if (resultsContainer) {
         resultsContainer.style.display = 'none';
+    }
+}
+
+async function loadWebhookHistory() {
+    const loading = document.getElementById('historyLoading');
+    const container = document.getElementById('webhookHistoryContainer');
+    if (!loading || !container) return;
+    
+    loading.style.display = 'block';
+    container.innerHTML = '';
+
+    try {
+        const res = await fetch('/api/webhooks/history');
+        if (!res.ok) throw new Error('Failed to load webhook history');
+        const history = await res.json();
+
+        loading.style.display = 'none';
+
+        if (!Array.isArray(history) || history.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #777; grid-column: 1/-1;">No events logged yet.</p>';
+            return;
+        }
+
+        history.forEach(item => {
+            container.appendChild(createHistoryCard(item));
+        });
+    } catch (err) {
+        loading.style.display = 'none';
+        showStatus(err.message, 'error');
+    }
+}
+
+function createHistoryCard(item) {
+    const div = document.createElement('div');
+    div.className = 'history-card';
+    div.id = `history-${item.id}`;
+
+    const dateStr = new Date(item.timestamp).toLocaleString();
+    const sourceClass = item.source.startsWith('Test') ? 'badge-source-test' : 'badge-source-incoming';
+    const eventBadgeClass = getBadgeClass(item.event);
+
+    const hasResponse = item.response !== null;
+    let responseSection = '';
+
+    if (hasResponse) {
+        const responseStatusClass = item.response.success ? 'test-status-success' : 'test-status-failure';
+        responseSection = `
+            <div style="margin-top: 10px;">
+                <label style="font-size: 11px; font-weight: bold; display: block; margin-bottom: 2px;">Response Status:</label>
+                <span class="test-status-pill ${responseStatusClass}" style="font-size: 11px; padding: 2px 6px;">
+                    HTTP ${item.response.status} ${item.response.statusText}
+                </span>
+            </div>
+            <div style="margin-top: 8px;">
+                <label style="font-size: 11px; font-weight: bold; display: block; margin-bottom: 2px;">Response Body:</label>
+                <pre style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px; border-radius: 4px; font-size: 11px; font-family: monospace; overflow-x: auto; margin: 0; max-height: 80px; text-align: left; white-space: pre-wrap; word-break: break-all;">${escapeHtml(item.response.responseBody)}</pre>
+            </div>
+        `;
+    }
+
+    div.innerHTML = `
+        <div class="history-meta">
+            <div>
+                <span class="badge ${eventBadgeClass}">${item.event}</span>
+                <span class="badge ${sourceClass}" style="margin-left: 4px;">${item.source}</span>
+            </div>
+            <span class="history-timestamp">${dateStr}</span>
+        </div>
+        <div style="text-align: left; font-size: 13px; color: var(--text-dark);">
+            Event ID: <span style="font-family: monospace; font-size: 12px; color: var(--text-muted);">${item.id}</span>
+        </div>
+        
+        <button class="history-payload-toggle" onclick="toggleHistoryPayload('${item.id}')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            View Payload details
+        </button>
+
+        <div class="history-details-block" id="history-details-${item.id}">
+            <div style="margin-bottom: 8px;">
+                <label style="font-size: 11px; font-weight: bold; display: block; margin-bottom: 2px;">JSON Payload:</label>
+                <pre style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px; border-radius: 4px; font-size: 11px; font-family: monospace; overflow-x: auto; margin: 0; max-height: 150px; text-align: left;">${escapeHtml(JSON.stringify(item.payload, null, 2))}</pre>
+            </div>
+            ${responseSection}
+        </div>
+    `;
+
+    return div;
+}
+
+function toggleHistoryPayload(id) {
+    const details = document.getElementById(`history-details-${id}`);
+    if (details) {
+        details.classList.toggle('open');
+        const btn = details.previousElementSibling;
+        const isOpen = details.classList.contains('open');
+        btn.innerHTML = isOpen 
+            ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg> Hide Payload details`
+            : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg> View Payload details`;
+    }
+}
+
+async function clearWebhookHistory() {
+    if (!confirm('Are you sure you want to clear the entire webhook event log?')) return;
+
+    try {
+        const res = await fetch('/api/webhooks/history', {
+            method: 'DELETE'
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            showStatus('Webhook history cleared successfully.', 'success');
+            loadWebhookHistory();
+        } else {
+            showStatus(`Error: ${data.error || 'Failed to clear log'}`, 'error');
+        }
+    } catch (err) {
+        showStatus(`An error occurred: ${err.message}`, 'error');
     }
 }
