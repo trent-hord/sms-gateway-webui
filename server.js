@@ -729,7 +729,8 @@ app.post('/webhooks/:id/test', async (req, res) => {
                 payload: {
                     messageId: "mock-sms-12345",
                     message: "Hello! This is a test message from your SMS Gateway WebUI.",
-                    sender: "+15550199",
+                    phoneNumber: "+18324251742",
+                    sender: "+18324251742",
                     recipient: "+15550100",
                     simNumber: 1,
                     receivedAt: now
@@ -743,7 +744,8 @@ app.post('/webhooks/:id/test', async (req, res) => {
                 id: "Ey6ECgOkVVFjz3CL48B8C",
                 payload: {
                     messageId: "mock-mms-12345",
-                    sender: "+15550199",
+                    phoneNumber: "+18324251742",
+                    sender: "+18324251742",
                     recipient: "+15550100",
                     simNumber: 1,
                     receivedAt: now,
@@ -764,7 +766,8 @@ app.post('/webhooks/:id/test', async (req, res) => {
                 id: "Ey6ECgOkVVFjz3CL48B8C",
                 payload: {
                     messageId: "mock-mms-12345",
-                    sender: "+15550199",
+                    phoneNumber: "+18324251742",
+                    sender: "+18324251742",
                     recipient: "+15550100",
                     simNumber: 1,
                     downloadedAt: now
