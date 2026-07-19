@@ -84,6 +84,18 @@ class SmsGatewayClient {
     getHealth() {
         return this.httpClient.get(`${this.baseUrl}/health`, this.defaultHeaders);
     }
+
+    getWebhooks() {
+        return this.httpClient.get(`${this.baseUrl}/webhooks`, this.defaultHeaders);
+    }
+
+    createWebhook(request) {
+        return this.httpClient.post(`${this.baseUrl}/webhooks`, request, this.defaultHeaders);
+    }
+
+    deleteWebhook(id) {
+        return this.httpClient.delete(`${this.baseUrl}/webhooks/${id}`, this.defaultHeaders);
+    }
 }
 
 function ensureJsonFile(filePath, defaultValue) {
@@ -544,6 +556,111 @@ app.delete('/contacts/:id', (req, res) => {
         res.json({ success: true, message: 'Contact deleted successfully' });
     } else {
         res.status(404).json({ error: 'Contact not found' });
+    }
+});
+
+// Webhooks endpoints
+app.get('/webhooks', async (req, res) => {
+    try {
+        const login = process.env.GATEWAY_LOGIN;
+        const password = process.env.GATEWAY_PASSWORD;
+        const baseUrl = getGatewayUrl();
+
+        if (!login || !password) {
+            return res.status(500).json({ error: 'Gateway credentials are not configured.' });
+        }
+
+        const httpClient = new NodeFetchClient();
+        const client = new SmsGatewayClient(login, password, httpClient, baseUrl);
+
+        const webhooks = await client.getWebhooks();
+        res.json(webhooks);
+    } catch (error) {
+        console.error('Error fetching webhooks:', error);
+        res.status(500).json({ error: 'Failed to fetch webhooks from gateway', details: error.message });
+    }
+});
+
+app.post('/webhooks', async (req, res) => {
+    try {
+        const { url, event } = req.body;
+        if (!url || !event) {
+            return res.status(400).json({ error: 'Webhook URL and Event are required.' });
+        }
+
+        const login = process.env.GATEWAY_LOGIN;
+        const password = process.env.GATEWAY_PASSWORD;
+        const baseUrl = getGatewayUrl();
+
+        if (!login || !password) {
+            return res.status(500).json({ error: 'Gateway credentials are not configured.' });
+        }
+
+        const httpClient = new NodeFetchClient();
+        const client = new SmsGatewayClient(login, password, httpClient, baseUrl);
+
+        const webhook = await client.createWebhook({ url, event });
+        res.json({ success: true, message: 'Webhook registered successfully', webhook });
+    } catch (error) {
+        console.error('Error registering webhook:', error);
+        res.status(500).json({ error: 'Failed to register webhook with gateway', details: error.message });
+    }
+});
+
+app.delete('/webhooks/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const login = process.env.GATEWAY_LOGIN;
+        const password = process.env.GATEWAY_PASSWORD;
+        const baseUrl = getGatewayUrl();
+
+        if (!login || !password) {
+            return res.status(500).json({ error: 'Gateway credentials are not configured.' });
+        }
+
+        const httpClient = new NodeFetchClient();
+        const client = new SmsGatewayClient(login, password, httpClient, baseUrl);
+
+        await client.deleteWebhook(id);
+        res.json({ success: true, message: 'Webhook deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting webhook:', error);
+        res.status(500).json({ error: 'Failed to delete webhook from gateway', details: error.message });
+    }
+});
+
+app.put('/webhooks/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { url, event } = req.body;
+        if (!url || !event) {
+            return res.status(400).json({ error: 'Webhook URL and Event are required.' });
+        }
+
+        const login = process.env.GATEWAY_LOGIN;
+        const password = process.env.GATEWAY_PASSWORD;
+        const baseUrl = getGatewayUrl();
+
+        if (!login || !password) {
+            return res.status(500).json({ error: 'Gateway credentials are not configured.' });
+        }
+
+        const httpClient = new NodeFetchClient();
+        const client = new SmsGatewayClient(login, password, httpClient, baseUrl);
+
+        // Delete old webhook
+        try {
+            await client.deleteWebhook(id);
+        } catch (e) {
+            console.warn(`Could not delete old webhook ${id} during update (it might have already been deleted):`, e);
+        }
+
+        // Register new webhook
+        const newWebhook = await client.createWebhook({ url, event });
+        res.json({ success: true, message: 'Webhook updated successfully', webhook: newWebhook });
+    } catch (error) {
+        console.error('Error updating webhook:', error);
+        res.status(500).json({ error: 'Failed to update webhook', details: error.message });
     }
 });
 
