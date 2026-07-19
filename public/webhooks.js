@@ -293,7 +293,11 @@ async function testWebhook(id) {
 
         const data = await res.json();
         
-        loadWebhookHistory();
+        if (currentLogSource === 'local') {
+            loadWebhookHistory();
+        } else {
+            loadServerLogs();
+        }
         
         const resultsContainer = document.getElementById(`test-results-${id}`);
         resultsContainer.style.display = 'block';
@@ -450,5 +454,123 @@ async function clearWebhookHistory() {
         }
     } catch (err) {
         showStatus(`An error occurred: ${err.message}`, 'error');
+    }
+}
+
+let currentLogSource = 'local';
+
+function switchLogSource(source) {
+    if (currentLogSource === source) return;
+    currentLogSource = source;
+
+    document.getElementById('toggle-local').classList.toggle('active', source === 'local');
+    document.getElementById('toggle-server').classList.toggle('active', source === 'server');
+
+    const relayBanner = document.getElementById('localRelayConfigBanner');
+    const clearBtn = document.getElementById('btnClearWebhookHistory');
+    
+    if (source === 'local') {
+        if (relayBanner) relayBanner.style.display = 'block';
+        if (clearBtn) clearBtn.style.display = 'inline-flex';
+        loadWebhookHistory();
+    } else {
+        if (relayBanner) relayBanner.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+        loadServerLogs();
+    }
+}
+
+async function loadServerLogs() {
+    const loading = document.getElementById('historyLoading');
+    const container = document.getElementById('webhookHistoryContainer');
+    if (!loading || !container) return;
+
+    loading.style.display = 'block';
+    container.innerHTML = '';
+
+    try {
+        const res = await fetch('/api/webhooks/logs-server');
+        if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.error || 'Failed to fetch gateway logs');
+        }
+        const logs = await res.json();
+
+        loading.style.display = 'none';
+
+        if (!Array.isArray(logs) || logs.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #777; grid-column: 1/-1;">No webhook-related logs found on gateway server.</p>';
+            return;
+        }
+
+        logs.forEach(log => {
+            container.appendChild(createServerLogCard(log));
+        });
+    } catch (err) {
+        loading.style.display = 'none';
+        container.innerHTML = `
+            <div style="grid-column: 1/-1; padding: 20px; border-radius: 8px; border: 1px solid #f5c6cb; background-color: #f8d7da; color: #721c24; text-align: left; font-size: 13px;">
+                <strong>Notice:</strong> ${err.message}<br>
+                <span style="font-size: 12px; margin-top: 5px; display: inline-block;">Gateway server logs may be disabled (e.g. running in Cloud mode) or authentication scopes are restricted. Try using Local Relay Log instead.</span>
+            </div>
+        `;
+    }
+}
+
+function createServerLogCard(log) {
+    const div = document.createElement('div');
+    div.className = 'history-card';
+    div.id = `server-log-${log.id}`;
+
+    const dateStr = log.timestamp ? new Date(log.timestamp).toLocaleString() : 'N/A';
+    
+    let priorityClass = 'badge-priority-unknown';
+    const priority = (log.priority || '').toUpperCase();
+    if (priority === 'ERROR') priorityClass = 'badge-priority-error';
+    else if (priority === 'WARN') priorityClass = 'badge-priority-warn';
+    else if (priority === 'INFO') priorityClass = 'badge-priority-info';
+    else if (priority === 'DEBUG') priorityClass = 'badge-priority-debug';
+
+    const hasContext = log.context && Object.keys(log.context).length > 0;
+    
+    div.innerHTML = `
+        <div class="history-meta">
+            <div>
+                <span class="badge ${priorityClass}">${escapeHtml(log.priority || 'log')}</span>
+                <span class="badge badge-custom" style="margin-left: 4px; text-transform: none;">Module: ${escapeHtml(log.module || 'system')}</span>
+            </div>
+            <span class="history-timestamp">${dateStr}</span>
+        </div>
+        
+        <div style="text-align: left; font-size: 13px; color: var(--text-dark); word-break: break-word; font-weight: 500;">
+            ${escapeHtml(log.message || '')}
+        </div>
+
+        ${hasContext ? `
+            <button class="history-payload-toggle" onclick="toggleServerLogContext('${log.id}')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                View Context details
+            </button>
+
+            <div class="history-details-block" id="server-log-context-${log.id}">
+                <div style="margin-bottom: 0;">
+                    <pre style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; border-radius: 4px; font-size: 11px; font-family: monospace; overflow-x: auto; margin: 0; max-height: 150px; text-align: left;">${escapeHtml(JSON.stringify(log.context, null, 2))}</pre>
+                </div>
+            </div>
+        ` : ''}
+    `;
+
+    return div;
+}
+
+function toggleServerLogContext(id) {
+    const details = document.getElementById(`server-log-context-${id}`);
+    if (details) {
+        details.classList.toggle('open');
+        const btn = details.previousElementSibling;
+        const isOpen = details.classList.contains('open');
+        btn.innerHTML = isOpen 
+            ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg> Hide Context details`
+            : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg> View Context details`;
     }
 }

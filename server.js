@@ -97,6 +97,10 @@ class SmsGatewayClient {
     deleteWebhook(id) {
         return this.httpClient.delete(`${this.baseUrl}/webhooks/${id}`, this.defaultHeaders);
     }
+
+    getLogs() {
+        return this.httpClient.get(`${this.baseUrl}/logs`, this.defaultHeaders);
+    }
 }
 
 function ensureJsonFile(filePath, defaultValue) {
@@ -874,6 +878,37 @@ app.get('/api/webhooks/history', (req, res) => {
 app.delete('/api/webhooks/history', (req, res) => {
     saveWebhookHistory([]);
     res.json({ success: true, message: 'Webhook history cleared' });
+});
+
+// Get system and application logs from the gateway server, filtered for webhooks
+app.get('/api/webhooks/logs-server', async (req, res) => {
+    try {
+        const login = process.env.GATEWAY_LOGIN;
+        const password = process.env.GATEWAY_PASSWORD;
+        const baseUrl = getGatewayUrl();
+
+        if (!login || !password) {
+            return res.status(500).json({ error: 'Gateway credentials are not configured.' });
+        }
+
+        const httpClient = new NodeFetchClient();
+        const client = new SmsGatewayClient(login, password, httpClient, baseUrl);
+
+        const logs = await client.getLogs();
+        const webhookLogs = Array.isArray(logs) ? logs.filter(log => {
+            const msg = (log.message || '').toLowerCase();
+            const module = (log.module || '').toLowerCase();
+            return msg.includes('webhook') || module.includes('webhook');
+        }) : [];
+
+        res.json(webhookLogs);
+    } catch (error) {
+        console.error('Error fetching gateway logs:', error);
+        res.status(500).json({ 
+            error: 'Failed to fetch logs from gateway server', 
+            details: error.message 
+        });
+    }
 });
 
 app.listen(PORT, () => {
