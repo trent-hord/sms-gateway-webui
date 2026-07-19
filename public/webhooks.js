@@ -80,6 +80,10 @@ function createWebhookCard(webhook) {
                 <span class="webhook-url">${escapeHtml(webhook.url)}</span>
             </div>
             <div class="actions-group">
+                <button class="btn btn-success btn-test" id="btn-test-${webhook.id}" onclick="testWebhook('${webhook.id}')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    Test
+                </button>
                 <button class="btn btn-secondary btn-edit" onclick="toggleEdit('${webhook.id}', true)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
                     Edit
@@ -88,6 +92,25 @@ function createWebhookCard(webhook) {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                     Delete
                 </button>
+            </div>
+        </div>
+
+        <!-- Test Results Container -->
+        <div class="test-results-container" id="test-results-${webhook.id}" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h4 style="margin: 0; font-size: 13px; font-weight: 600;">Test Connection Results</h4>
+                <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px; width: auto;" onclick="closeTestResults('${webhook.id}')">Dismiss</button>
+            </div>
+            <div id="test-status-badge-${webhook.id}" style="margin-bottom: 10px;"></div>
+            
+            <div class="form-group" style="margin-bottom: 8px;">
+                <label style="font-size: 11px; margin-bottom: 2px; text-align: left;">Payload Sent</label>
+                <pre id="test-payload-${webhook.id}" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; border-radius: 4px; font-size: 11px; font-family: monospace; overflow-x: auto; margin: 0; max-height: 150px; text-align: left;"></pre>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 11px; margin-bottom: 2px; text-align: left;">Server Response Body</label>
+                <pre id="test-response-${webhook.id}" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; border-radius: 4px; font-size: 11px; font-family: monospace; overflow-x: auto; margin: 0; max-height: 150px; white-space: pre-wrap; word-break: break-all; text-align: left;"></pre>
             </div>
         </div>
 
@@ -239,4 +262,66 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+
+async function testWebhook(id) {
+    const btn = document.getElementById(`btn-test-${id}`);
+    const originalText = btn.innerHTML;
+    
+    btn.setAttribute('disabled', 'true');
+    btn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+        Testing...
+    `;
+
+    try {
+        const res = await fetch(`/webhooks/${id}/test`, {
+            method: 'POST'
+        });
+        
+        if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.error || 'Connection test failed');
+        }
+
+        const data = await res.json();
+        
+        const resultsContainer = document.getElementById(`test-results-${id}`);
+        resultsContainer.style.display = 'block';
+
+        const statusBadge = document.getElementById(`test-status-badge-${id}`);
+        const payloadPre = document.getElementById(`test-payload-${id}`);
+        const responsePre = document.getElementById(`test-response-${id}`);
+
+        payloadPre.innerText = JSON.stringify(data.payload, null, 2);
+        responsePre.innerText = data.responseBody || '(empty response body)';
+
+        if (data.success) {
+            statusBadge.innerHTML = `
+                <span class="test-status-pill test-status-success">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    Success (HTTP ${data.status} ${data.statusText || 'OK'})
+                </span>
+            `;
+        } else {
+            statusBadge.innerHTML = `
+                <span class="test-status-pill test-status-failure">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    Failed (HTTP ${data.status} ${data.statusText || 'Error'})
+                </span>
+            `;
+        }
+    } catch (err) {
+        showStatus(err.message, 'error');
+    } finally {
+        btn.removeAttribute('disabled');
+        btn.innerHTML = originalText;
+    }
+}
+
+function closeTestResults(id) {
+    const resultsContainer = document.getElementById(`test-results-${id}`);
+    if (resultsContainer) {
+        resultsContainer.style.display = 'none';
+    }
 }

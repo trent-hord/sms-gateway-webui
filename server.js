@@ -664,6 +664,135 @@ app.put('/webhooks/:id', async (req, res) => {
     }
 });
 
+app.post('/webhooks/:id/test', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const login = process.env.GATEWAY_LOGIN;
+        const password = process.env.GATEWAY_PASSWORD;
+        const baseUrl = getGatewayUrl();
+
+        if (!login || !password) {
+            return res.status(500).json({ error: 'Gateway credentials are not configured.' });
+        }
+
+        const httpClient = new NodeFetchClient();
+        const client = new SmsGatewayClient(login, password, httpClient, baseUrl);
+
+        // Fetch webhooks from gateway to find the webhook's URL and Event
+        const webhooks = await client.getWebhooks();
+        const webhook = webhooks.find(w => w.id === id);
+
+        if (!webhook) {
+            return res.status(404).json({ error: 'Webhook not found on gateway' });
+        }
+
+        const now = new Date().toISOString();
+        let mockPayload = {};
+
+        if (webhook.event === 'sms:received') {
+            mockPayload = {
+                deviceId: "ffffffffceb0b1db0000018e937c815b",
+                event: "sms:received",
+                id: "Ey6ECgOkVVFjz3CL48B8C",
+                payload: {
+                    messageId: "mock-sms-12345",
+                    message: "Hello! This is a test message from your SMS Gateway WebUI.",
+                    sender: "+15550199",
+                    recipient: "+15550100",
+                    simNumber: 1,
+                    receivedAt: now
+                },
+                webhookId: webhook.id
+            };
+        } else if (webhook.event === 'mms:received') {
+            mockPayload = {
+                deviceId: "ffffffffceb0b1db0000018e937c815b",
+                event: "mms:received",
+                id: "Ey6ECgOkVVFjz3CL48B8C",
+                payload: {
+                    messageId: "mock-mms-12345",
+                    sender: "+15550199",
+                    recipient: "+15550100",
+                    simNumber: 1,
+                    receivedAt: now,
+                    parts: [
+                        {
+                            contentType: "image/jpeg",
+                            fileName: "test_photo.jpg",
+                            fileSize: 154320
+                        }
+                    ]
+                },
+                webhookId: webhook.id
+            };
+        } else if (webhook.event === 'mms:downloaded') {
+            mockPayload = {
+                deviceId: "ffffffffceb0b1db0000018e937c815b",
+                event: "mms:downloaded",
+                id: "Ey6ECgOkVVFjz3CL48B8C",
+                payload: {
+                    messageId: "mock-mms-12345",
+                    sender: "+15550199",
+                    recipient: "+15550100",
+                    simNumber: 1,
+                    downloadedAt: now
+                },
+                webhookId: webhook.id
+            };
+        } else {
+            mockPayload = {
+                deviceId: "ffffffffceb0b1db0000018e937c815b",
+                event: webhook.event,
+                id: "Ey6ECgOkVVFjz3CL48B8C",
+                payload: {
+                    test: "success",
+                    ping: "pong",
+                    timestamp: now
+                },
+                webhookId: webhook.id
+            };
+        }
+
+        // Send mock post request
+        let response;
+        try {
+            response = await fetch(webhook.url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Sms-Gateway-Test': 'true'
+                },
+                body: JSON.stringify(mockPayload),
+                timeout: 10000
+            });
+        } catch (fetchError) {
+            return res.json({
+                success: false,
+                status: 0,
+                statusText: 'Request Failed',
+                payload: mockPayload,
+                responseBody: fetchError.message
+            });
+        }
+
+        const responseText = await response.text();
+        const truncatedResponse = responseText.length > 2000 
+            ? responseText.substring(0, 2000) + '... (truncated)' 
+            : responseText;
+
+        res.json({
+            success: response.ok,
+            status: response.status,
+            statusText: response.statusText,
+            payload: mockPayload,
+            responseBody: truncatedResponse
+        });
+    } catch (error) {
+        console.error('Error testing webhook:', error);
+        res.status(500).json({ error: 'Failed to test webhook', details: error.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
